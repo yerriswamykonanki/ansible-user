@@ -1,0 +1,39 @@
+---
+ - name: Load passwords from vault
+   include_vars: user_passwords.yml
+
+ - name: Maintain sudoers file for backup
+   command: cp -f /etc/sudoers /etc/sudoers.tmp
+
+ - name: Ensure group "developers" exists
+   group:
+     name: developers
+     state: present
+
+ - lineinfile:
+     path: /etc/sudoers
+     state: present
+     regexp: '^%developers\s'
+     line: '%developers ALL=(ALL) NOPASSWD: ALL'
+
+# - name: Add the user 'james' with a bash shell, appending the group 'admins' and 'developers' to the user's groups
+#     user:
+#     name: james
+#     shell: /bin/bash
+#     group: developers
+#     password: root1234
+#     append: yes
+#     update_password: on_create
+
+# - name: Force password renewal for newly created users
+#   command: chage -d 0 james
+
+ - name: Create users
+   user: name="{{item.key}}" password="{{item.value}}" shell="/bin/bash" update_password=on_create group=developers
+   with_dict: "{{ user_passwords }}"
+   register: user_results
+
+ - name: Force password renewal for newly created users
+   command: chage -d 0 {{item.item.key}} # item.item is the key/value pair from the dict in the previous task
+   when: "{{item.changed == true}}"
+   with_items: "{{ user_results.results }}"
